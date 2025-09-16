@@ -1,0 +1,32 @@
+[
+    {
+        "id": "app-chat",
+        "name": "Aplikasi Chat",
+        "description": "Aplikasi chat super cepat dan aman. Hubungi teman dan keluarga dengan mudah.",
+        "icon": "https://simpleicons.org/icons/signal.svg",
+        "creator": "Tim Cepat",
+        "androidVersion": "Android 8.0+",
+        "appVersion": "v1.2.5",
+        "downloadUrl": "folder-aplikasi/aplikasi-chat.zip"
+    },
+    {
+        "id": "app-foto",
+        "name": "Aplikasi Edit Foto",
+        "description": "Edit foto Anda dengan filter keren dan alat profesional. Buat foto Anda lebih menakjubkan.",
+        "icon": "https://simpleicons.org/icons/photoshop.svg",
+        "creator": "Kreator Foto",
+        "androidVersion": "Android 10.0+",
+        "appVersion": "v2.0.1",
+        "downloadUrl": "folder-aplikasi/aplikasi-edit-foto.zip"
+    },
+    {
+        "id": "app-musik",
+        "name": "Aplikasi Musik",
+        "description": "Dengarkan musik favorit tanpa batas. Buat playlist Anda sendiri.",
+        "icon": "https://simpleicons.org/icons/spotify.svg",
+        "creator": "Musik Digital",
+        "androidVersion": "Android 7.0+",
+        "appVersion": "v3.1.0",
+        "downloadUrl": "folder-aplikasi/aplikasi-musik.zip"
+    }
+]

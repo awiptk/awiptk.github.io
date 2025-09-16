@@ -1,122 +1,155 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Detail Aplikasi</title>
-    <link rel="icon" href="favicon.ico" type="image/x-icon">
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f0f2f5; color: #333; margin: 0; line-height: 1.6; }
-        header { background: #4CAF50; color: white; padding: 2rem 1rem; text-align: center; }
-        header h1 { margin: 0; }
-        main { max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
-        .app-detail { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; }
-        .back-btn { display: inline-block; margin-bottom: 2rem; background-color: #2196F3; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; transition: background-color 0.3s ease; }
-        .back-btn:hover { background-color: #0d8bf2; }
-        .detail-icon { width: 100px; height: 100px; object-fit: cover; border-radius: 15px; margin: 0 auto 1rem; display: block; filter: grayscale(100%); }
-        .detail-info { max-width: 450px; margin: 0 auto; text-align: left; }
-        .detail-info h3 { margin-top: 0; text-align: center; color: #4CAF50; }
-        .detail-info ul { list-style: none; padding: 0; }
-        .detail-info li { margin-bottom: 1rem; display: flex; align-items: center; background-color: #f8f8f8; padding: 10px; border-radius: 5px; }
-        .detail-info li img { width: 20px; height: 20px; margin-right: 15px; filter: grayscale(100%); }
-        .download-btn { display: block; width: 100%; text-align: center; background-color: #2196F3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin-top: 2rem; transition: background-color 0.3s ease; }
-        .download-btn:hover { background-color: #0d8bf2; }
-        footer { text-align: center; padding: 1rem; color: #777; font-size: 0.9rem; }
-        .teks-merah { color: #e91e63; font-weight: bold; }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Detail Aplikasi</title>
+  <link rel="icon" href="favicon.ico" type="image/x-icon" />
+  <style>
+    :root{
+      --bg:#f7f8fb;--card:#fff;--muted:#6b7280;--accent:#4CAF50;--danger:#d32f2f;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background:var(--bg);color:#222;
+    }
+    header{background:var(--accent);color:#fff;padding:1.25rem;text-align:center}
+    main{max-width:900px;margin:2rem auto;padding:0 1rem}
+    .card{background:var(--card);padding:1.25rem;border-radius:12px;box-shadow:0 8px 24px rgba(16,24,40,0.06)}
+    .top{display:flex;gap:1rem;align-items:center}
+    .detail-icon{width:96px;height:96px;border-radius:14px;overflow:hidden;flex:0 0 96px;background:#f0f3f7;display:flex;align-items:center;justify-content:center}
+    .detail-icon img{width:100%;height:100%;object-fit:cover}
+    .meta h2{margin:0;font-size:1.25rem}
+    .meta .sub{color:var(--muted);margin-top:.25rem;font-size:.95rem}
+    .info{margin-top:1rem;white-space:pre-wrap}
+    .teks-merah{color:var(--danger);font-weight:600}
+    .meta-row{display:flex;gap:1rem;margin-top:.75rem;flex-wrap:wrap;color:var(--muted)}
+    a.back{display:inline-block;margin-bottom:1rem;text-decoration:none;color:var(--accent);font-weight:600}
+    .download{display:inline-block;margin-top:1rem;padding:.5rem .8rem;border-radius:10px;background:var(--accent);color:#fff;text-decoration:none}
+  </style>
 </head>
 <body>
-    <header>
-        <h1>Detail Aplikasi</h1>
-    </header>
+  <header><h1>Detail Aplikasi</h1></header>
 
-    <main>
-        <div class="app-detail">
-            <a href="index.html" class="back-btn">Kembali ke Daftar</a>
-            <div id="loading-message">Memuat...</div>
-            <div id="app-content" style="display:none;">
-                <img id="detail-icon" class="detail-icon" alt="Ikon Aplikasi">
-                <div id="detail-info" class="detail-info">
-                    <h3 id="detail-name"></h3>
-                    <p id="detail-description"></p>
-                    <ul>
-                        <li>
-                            <img src="https://simpleicons.org/icons/filesize.svg" alt="Ikon Ukuran File">
-                            <span id="detail-file-size"></span>
-                        </li>
-                        <li>
-                            <img src="https://simpleicons.org/icons/github.svg" alt="Ikon Pembuat">
-                            <span id="detail-creator"></span>
-                        </li>
-                        <li>
-                            <img src="https://simpleicons.org/icons/appwrite.svg" alt="Ikon Versi Aplikasi">
-                            <span id="detail-app-version"></span>
-                        </li>
-                    </ul>
-                    <a id="detail-download-btn" href="#" class="download-btn" download>Unduh</a>
-                </div>
+  <main>
+    <a class="back" href="index.html">&larr; Kembali ke daftar</a>
+
+    <div id="wrap" class="card" aria-live="polite">
+      <div id="loading">Memuat detail...</div>
+
+      <div id="content" style="display:none">
+        <div class="top">
+          <div class="detail-icon"><img id="detail-icon" alt=""></div>
+          <div class="meta">
+            <h2 id="detail-name"></h2>
+            <div class="sub" id="detail-creator"></div>
+            <div class="meta-row">
+              <div id="detail-version"></div>
+              <div id="detail-filesize"></div>
             </div>
-            <div id="not-found-message" style="display:none;">
-                <p>Maaf, aplikasi yang Anda cari tidak ditemukan.</p>
-            </div>
+          </div>
         </div>
-    </main>
 
-    <footer>
-        <p>&copy; 2025 Aplikasi Keren. Semua Hak Cipta Dilindungi.</p>
-    </footer>
+        <div class="info" id="detail-description" style="margin-top:1rem"></div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            const appId = urlParams.get('id');
-            const loadingMsg = document.getElementById('loading-message');
-            const appContent = document.getElementById('app-content');
-            const notFoundMsg = document.getElementById('not-found-message');
+        <a id="download-link" class="download" href="#" target="_blank" rel="noopener">Unduh / Lihat</a>
+      </div>
+    </div>
+  </main>
 
-            fetch('data.json')
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Jaringan tidak merespons. Status: ' + response.status);
-                    }
-                    return response.json();
-                })
-                .then(appData => {
-                    const app = appData.find(a => a.id === appId);
-                    loadingMsg.style.display = 'none';
+  <script>
+    // Utility: get query param
+    function getParam(name){
+      const u = new URL(window.location.href);
+      return u.searchParams.get(name);
+    }
 
-                    if (app) {
-                        document.title = `Detail Aplikasi: ${app.name}`;
-                        document.getElementById('detail-icon').src = app.icon;
-                        document.getElementById('detail-name').textContent = app.name;
-                        document.getElementById('detail-creator').textContent = app.creator;
-                        document.getElementById('detail-file-size').textContent = app.fileSize;
-                        document.getElementById('detail-app-version').textContent = app.appVersion;
-                        document.getElementById('detail-download-btn').href = app.downloadUrl;
-                        appContent.style.display = 'block';
+    // Escape for RegExp
+    function escapeRegExp(s){
+      return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
 
-                        let descriptionText = app.description;
-                        descriptionText = descriptionText.replace(/\n/g, '<br>');
+    // small HTML escape for text nodes
+    function escapeHtml(s){
+      return String(s||'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+    }
 
-                        if (app.highlightWords && app.highlightWords.length > 0) {
-                            app.highlightWords.forEach(word => {
-                                const regex = new RegExp(`\\b(${word})\\b`, 'gi');
-                                descriptionText = descriptionText.replace(regex, `<span class="teks-merah">$1</span>`);
-                            });
-                        }
-                        document.getElementById('detail-description').innerHTML = descriptionText;
-                    } else {
-                        document.title = "Aplikasi Tidak Ditemukan";
-                        notFoundMsg.style.display = 'block';
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    loadingMsg.style.display = 'none';
-                    notFoundMsg.style.display = 'block';
-                    notFoundMsg.innerHTML = '<p>Gagal memuat data aplikasi. Silakan coba lagi nanti.</p>';
-                });
-        });
-    </script>
+    (async function init(){
+      const id = getParam('id');
+      if(!id){
+        document.getElementById('wrap').innerText = 'ID aplikasi tidak ditemukan pada URL.';
+        return;
+      }
+
+      let data;
+      try{
+        const res = await fetch('data.json', {cache: 'no-store'});
+        if(!res.ok) throw new Error('Gagal memuat data.json');
+        data = await res.json();
+      }catch(err){
+        console.error(err);
+        document.getElementById('wrap').innerText = 'Gagal memuat data.';
+        return;
+      }
+
+      const app = data.find(it => it.id === id);
+      if(!app){
+        document.getElementById('wrap').innerText = 'Aplikasi tidak ditemukan.';
+        return;
+      }
+
+      // fill UI
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('content').style.display = 'block';
+
+      document.getElementById('detail-name').textContent = app.name || '';
+      document.getElementById('detail-creator').textContent = app.creator || '';
+      document.getElementById('detail-version').textContent = app.appVersion ? `Versi: ${app.appVersion}` : '';
+      document.getElementById('detail-filesize').textContent = app.fileSize ? `Ukuran: ${app.fileSize}` : '';
+      const icon = document.getElementById('detail-icon');
+      icon.src = app.icon || '';
+      icon.alt = `Ikon ${app.name || ''}`;
+
+      // description with highlights:
+      // we will escape HTML then replace matches with <span class="teks-merah">...</span>
+      let desc = app.description || '';
+      // Escape HTML so user's content treated as plain text (prevents injection)
+      // but we need to preserve newlines -> use pre-wrap in CSS (already set)
+      let escaped = escapeHtml(desc);
+
+      // apply highlights if any
+      if (Array.isArray(app.highlightWords) && app.highlightWords.length > 0) {
+        // Build a combined regex using escaped alternatives.
+        // We avoid \b to allow punctuation like "NOTE:" to match.
+        // To prefer longer matches first, sort by length desc.
+        const words = app.highlightWords.slice().sort((a,b)=>b.length - a.length);
+        // Escape each for regex and join using |
+        const pattern = words.map(w => escapeRegExp(w)).join('|');
+        try {
+          const regex = new RegExp(`(${pattern})`, 'gi');
+          // replace on escaped text (safe)
+          escaped = escaped.replace(regex, '<span class="teks-merah">$1</span>');
+        } catch (e) {
+          // If regex fails (very unlikely), fall back to iterative replacement
+          words.forEach(w => {
+            const wEsc = escapeRegExp(w);
+            const r = new RegExp(`(${wEsc})`, 'gi');
+            escaped = escaped.replace(r, '<span class="teks-merah">$1</span>');
+          });
+        }
+      }
+
+      document.getElementById('detail-description').innerHTML = escaped;
+      const dl = document.getElementById('download-link');
+      if (app.downloadUrl) {
+        dl.href = app.downloadUrl;
+        dl.style.display = 'inline-block';
+      } else {
+        dl.style.display = 'none';
+      }
+
+    })();
+  </script>
 </body>
 </html>

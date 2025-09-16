@@ -1,79 +1,166 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Daftar Aplikasi</title>
-    <link rel="icon" href="favicon.ico" type="image/x-icon">
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f0f2f5; color: #333; margin: 0; line-height: 1.6; }
-        header { background: #4CAF50; color: white; padding: 2rem 1rem; text-align: center; }
-        header h1 { margin: 0; }
-        main { max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
-        .app-list-container { background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .app-item { display: flex; align-items: center; padding: 1.5rem; border-bottom: 1px solid #eee; cursor: pointer; transition: background-color 0.3s ease; text-decoration: none; color: inherit; }
-        .app-item:last-child { border-bottom: none; }
-        .app-item:hover { background-color: #f9f9f9; }
-        .app-icon { width: 50px; height: 50px; object-fit: cover; border-radius: 10px; margin-right: 1.5rem; filter: grayscale(100%); }
-        .app-item-info { flex-grow: 1; }
-        .app-item h2 { margin: 0; font-size: 1.25rem; color: #4CAF50; }
-        .app-item p { margin: 0.25rem 0 0; color: #666; }
-        footer { text-align: center; padding: 1rem; color: #777; font-size: 0.9rem; }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Daftar Aplikasi</title>
+  <link rel="icon" href="favicon.ico" type="image/x-icon" />
+  <style>
+    :root{
+      --bg:#000000;
+      --card:#333;
+      --accent:#4CAF50;
+      --muted:#6b7280;
+      --danger:#d32f2f;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background:var(--bg);
+      color:#222;
+      line-height:1.5;
+    }
+    header{
+      background:var(--accent);
+      color:#fff;
+      padding:1.5rem;
+      text-align:center;
+    }
+    main{max-width:980px;margin:2rem auto;padding:0 1rem;}
+    .list{
+      display:grid;
+      gap:1rem;
+      grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+    }
+    .card{
+      background:var(--card);
+      padding:1rem;
+      border-radius:12px;
+      box-shadow:0 6px 18px rgba(16,24,40,0.06);
+      display:flex;
+      gap:0.75rem;
+      align-items:center;
+      text-decoration:none;
+      color:inherit;
+      transition:transform .12s ease, box-shadow .12s ease;
+    }
+    .card:hover{transform:translateY(-4px);box-shadow:0 12px 30px rgba(16,24,40,0.12);}
+    .icon{
+      width:64px;height:64px;border-radius:12px;flex:0 0 64px;background:#f6f8fb;display:flex;align-items:center;justify-content:center;overflow:hidden;
+    }
+    .icon img{width:100%;height:100%;object-fit:cover}
+    .meta h3{margin:0 0 .25rem 0;font-size:1.05rem}
+    .meta p{margin:0;color:var(--muted);font-size:.92rem}
+    .small{font-size:.8rem;color:var(--muted)}
+    .search{
+      width:100%;
+      margin-bottom:1rem;
+      display:flex;
+      gap:.5rem;
+    }
+    .search input{
+      flex:1;padding:.6rem .8rem;border-radius:10px;border:1px solid #e6e9ef;background:#fff;
+    }
+    .search button{
+      padding:.6rem .9rem;border-radius:10px;border:0;background:var(--accent);color:#fff;cursor:pointer;
+    }
+    footer{max-width:980px;margin:2rem auto 6rem;padding:0 1rem;color:var(--muted);font-size:.9rem;text-align:center}
+  </style>
 </head>
 <body>
-    <header>
-        <h1>Daftar Aplikasi</h1>
-        <p>Pilih aplikasi untuk melihat detailnya.</p>
-    </header>
+  <header>
+    <h1>Daftar Aplikasi</h1>
+    <div style="font-size:.95rem;margin-top:.35rem;opacity:.95">Klik kartu untuk melihat detail</div>
+  </header>
 
-    <main>
-        <div class="app-list-container" id="app-list">
-            <!-- Daftar aplikasi akan dimasukkan di sini secara otomatis -->
+  <main>
+    <div class="search" role="search">
+      <input id="q" type="search" placeholder="Cari aplikasi (nama / deskripsi)..." />
+      <button id="clear">Reset</button>
+    </div>
+
+    <div id="app-list" class="list" aria-live="polite">
+      <!-- Diisi oleh JS -->
+    </div>
+
+    <div id="empty" style="display:none;margin-top:1rem;color:var(--muted)">Tidak ada aplikasi yang cocok.</div>
+  </main>
+
+  <footer>Data dimuat dari <code>data.json</code></footer>
+
+  <script>
+    // Helper: load JSON
+    async function loadData() {
+      const res = await fetch('data.json', {cache: 'no-store'});
+      if (!res.ok) throw new Error('Gagal memuat data.json');
+      return await res.json();
+    }
+
+    function createCard(app) {
+      const a = document.createElement('a');
+      a.className = 'card';
+      a.href = `detail.html?id=${encodeURIComponent(app.id)}`;
+      a.setAttribute('aria-label', `Buka detail ${app.name}`);
+      a.innerHTML = `
+        <div class="icon"><img src="${app.icon}" alt="Ikon ${escapeHtml(app.name)}"></div>
+        <div class="meta">
+          <h3>${escapeHtml(app.name)}</h3>
+          <p>${escapeHtml((app.description||'').split('\\n')[0])}</p>
+          <div class="small">${escapeHtml(app.creator || '')} • ${escapeHtml(app.fileSize || '')}</div>
         </div>
-    </main>
+      `;
+      return a;
+    }
 
-    <footer>
-        <p>&copy; 2025 Aplikasi Keren. Semua Hak Cipta Dilindungi.</p>
-    </footer>
+    // very small escape to prevent HTML injection when rendering plain text from JSON
+    function escapeHtml(s){
+      return String(s||'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+    }
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const appList = document.getElementById('app-list');
+    (async function(){
+      let data = [];
+      try{
+        data = await loadData();
+      }catch(e){
+        document.getElementById('app-list').innerText = 'Gagal memuat data.';
+        console.error(e);
+        return;
+      }
 
-            fetch('data.json')
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Jaringan tidak merespons. Status: ' + response.status);
-                    }
-                    return response.json();
-                })
-                .then(appData => {
-                    renderAppList(appData);
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    appList.innerHTML = '<p>Gagal memuat daftar aplikasi. Silakan coba lagi nanti.</p>';
-                });
+      const appList = document.getElementById('app-list');
+      const empty = document.getElementById('empty');
+      const q = document.getElementById('q');
 
-            function renderAppList(appData) {
-                appList.innerHTML = '';
-                appData.forEach(app => {
-                    const appLink = document.createElement('a');
-                    appLink.href = `detail.html?id=${app.id}`;
-                    appLink.className = 'app-item';
+      function render(list){
+        appList.innerHTML = '';
+        if(list.length === 0){
+          empty.style.display = 'block';
+          return;
+        }
+        empty.style.display = 'none';
+        list.forEach(app => appList.appendChild(createCard(app)));
+      }
 
-                    appLink.innerHTML = `
-                        <img src="${app.icon}" alt="Ikon ${app.name}" class="app-icon">
-                        <div class="app-item-info">
-                            <h2>${app.name}</h2>
-                            <p>${app.description.split('\n')[0]}</p>
-                        </div>
-                    `;
-                    appList.appendChild(appLink);
-                });
-            }
+      render(data);
+
+      // simple search
+      function filterByQuery(term){
+        term = (term||'').trim().toLowerCase();
+        if(!term) return data.slice();
+        return data.filter(app => {
+          const hay = `${app.name} ${app.description || ''} ${(app.creator||'')}`.toLowerCase();
+          return hay.indexOf(term) !== -1;
         });
-    </script>
+      }
+
+      q.addEventListener('input', e => render(filterByQuery(e.target.value)));
+      document.getElementById('clear').addEventListener('click', ()=>{
+        q.value = '';
+        render(data);
+      });
+
+    })();
+  </script>
 </body>
 </html>

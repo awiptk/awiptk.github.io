@@ -41,15 +41,19 @@
         document.addEventListener('DOMContentLoaded', () => {
             const appList = document.getElementById('app-list');
 
-            // Ambil data dari file JSON
             fetch('data.json')
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Jaringan tidak merespons. Status: ' + response.status);
+                    }
+                    return response.json();
+                })
                 .then(appData => {
                     renderAppList(appData);
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    appList.innerHTML = '<p>Gagal memuat daftar aplikasi.</p>';
+                    appList.innerHTML = '<p>Gagal memuat daftar aplikasi. Silakan coba lagi nanti.</p>';
                 });
 
             function renderAppList(appData) {
@@ -63,7 +67,7 @@
                         <img src="${app.icon}" alt="Ikon ${app.name}" class="app-icon">
                         <div class="app-item-info">
                             <h2>${app.name}</h2>
-                            <p>${app.description}</p>
+                            <p>${app.description.split('\n')[0]}</p>
                         </div>
                     `;
                     appList.appendChild(appLink);

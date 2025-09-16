@@ -22,6 +22,7 @@
         .download-btn { display: block; width: 100%; text-align: center; background-color: #2196F3; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin-top: 2rem; transition: background-color 0.3s ease; }
         .download-btn:hover { background-color: #0d8bf2; }
         footer { text-align: center; padding: 1rem; color: #777; font-size: 0.9rem; }
+        .teks-merah { color: #e91e63; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -40,8 +41,8 @@
                     <p id="detail-description"></p>
                     <ul>
                         <li>
-                            <img src="https://simpleicons.org/icons/android.svg" alt="Ikon Android">
-                            <span id="detail-android-version"></span>
+                            <img src="https://simpleicons.org/icons/filesize.svg" alt="Ikon Ukuran File">
+                            <span id="detail-file-size"></span>
                         </li>
                         <li>
                             <img src="https://simpleicons.org/icons/github.svg" alt="Ikon Pembuat">
@@ -74,22 +75,36 @@
             const notFoundMsg = document.getElementById('not-found-message');
 
             fetch('data.json')
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Jaringan tidak merespons. Status: ' + response.status);
+                    }
+                    return response.json();
+                })
                 .then(appData => {
                     const app = appData.find(a => a.id === appId);
-
                     loadingMsg.style.display = 'none';
 
                     if (app) {
                         document.title = `Detail Aplikasi: ${app.name}`;
                         document.getElementById('detail-icon').src = app.icon;
                         document.getElementById('detail-name').textContent = app.name;
-                        document.getElementById('detail-description').textContent = app.description;
                         document.getElementById('detail-creator').textContent = app.creator;
-                        document.getElementById('detail-android-version').textContent = app.androidVersion;
+                        document.getElementById('detail-file-size').textContent = app.fileSize;
                         document.getElementById('detail-app-version').textContent = app.appVersion;
                         document.getElementById('detail-download-btn').href = app.downloadUrl;
                         appContent.style.display = 'block';
+
+                        let descriptionText = app.description;
+                        descriptionText = descriptionText.replace(/\n/g, '<br>');
+
+                        if (app.highlightWords && app.highlightWords.length > 0) {
+                            app.highlightWords.forEach(word => {
+                                const regex = new RegExp(`\\b(${word})\\b`, 'gi');
+                                descriptionText = descriptionText.replace(regex, `<span class="teks-merah">$1</span>`);
+                            });
+                        }
+                        document.getElementById('detail-description').innerHTML = descriptionText;
                     } else {
                         document.title = "Aplikasi Tidak Ditemukan";
                         notFoundMsg.style.display = 'block';
@@ -99,7 +114,7 @@
                     console.error('Error:', error);
                     loadingMsg.style.display = 'none';
                     notFoundMsg.style.display = 'block';
-                    notFoundMsg.innerHTML = '<p>Gagal memuat data aplikasi.</p>';
+                    notFoundMsg.innerHTML = '<p>Gagal memuat data aplikasi. Silakan coba lagi nanti.</p>';
                 });
         });
     </script>

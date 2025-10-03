@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Upload File dari URL ke Google Drive</title>
+</head>
+<body>
+<h2>Upload File via URL ke Google Drive</h2>
+
+<input type="text" id="fileUrl" placeholder="Masukkan URL file" style="width:400px">
+<button id="uploadBtn">Upload ke Drive</button>
+
+<script src="https://apis.google.com/js/api.js"></script>
+<script>
+const CLIENT_ID = '958571020072-3s9rvi1b09qq7c5e5me9hjp2im28qpjr.apps.googleusercontent.com';
+const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+
+gapi.load('client:auth2', () => {
+  gapi.auth2.init({client_id: CLIENT_ID});
+});
+
+async function authenticate() {
+  return gapi.auth2.getAuthInstance()
+    .signIn({scope: SCOPES});
+}
+
+async function loadClient() {
+  return gapi.client.load('https://content.googleapis.com/discovery/v1/apis/drive/v3/rest');
+}
+
+async function uploadFromURL(url) {
+  try {
+    // Gunakan proxy CORS jika URL blokir CORS
+    const proxy = 'https://corsproxy.io/?';
+    const response = await fetch(proxy + encodeURIComponent(url));
+    const blob = await response.blob();
+
+    const metadata = { name: url.split('/').pop(), mimeType: blob.type || 'application/octet-stream' };
+    const accessToken = gapi.auth.getToken().access_token;
+
+    const formData = new FormData();
+    formData.append("metadata", new Blob([JSON.stringify(metadata)], {type: "application/json"}));
+    formData.append("file", blob);
+
+    const uploadResponse = await fetch(
+      "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id",
+      {
+        method: "POST",
+        headers: { Authorization: "Bearer " + accessToken },
+        body: formData
+      }
+    );
+
+    const result = await uploadResponse.json();
+    alert("File berhasil di-upload! ID: " + result.id + "\nURL: https://drive.google.com/uc?id=" + result.id + "&export=download");
+  } catch (err) {
+    console.error(err);
+    alert("Gagal upload: " + err.message);
+  }
+}
+
+document.getElementById('uploadBtn').onclick = async () => {
+  const url = document.getElementById('fileUrl').value.trim();
+  if (!url) return alert('Masukkan URL file!');
+  await authenticate();
+  await loadClient();
+  await uploadFromURL(url);
+};
+</script>
+</body>
+  </html>

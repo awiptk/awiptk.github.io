@@ -1,0 +1,100 @@
+name: Upload to Google Drive
+
+on:
+  workflow_dispatch:
+    inputs:
+      file_url:
+        description: 'URL file yang ingin diupload'
+        required: true
+        type: string
+      file_name:
+        description: 'Nama file (opsional, kosongkan untuk otomatis)'
+        required: false
+        type: string
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+    
+    - name: Download file from URL
+      run: |
+        echo "📥 Downloading file from: ${{ inputs.file_url }}"
+        FILE_NAME="${{ inputs.file_name }}"
+        if [ -z "$FILE_NAME" ]; then
+          FILE_NAME=$(basename "${{ inputs.file_url }}" | cut -d'?' -f1)
+        fi
+        wget -O "$FILE_NAME" "${{ inputs.file_url }}"
+        echo "FILE_NAME=$FILE_NAME" >> $GITHUB_ENV
+        echo "✅ Downloaded: $FILE_NAME ($(du -h "$FILE_NAME" | cut -f1))"
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        pip install google-auth google-auth-httplib2 google-api-python-client
+    
+    - name: Upload to Google Drive
+      env:
+        SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
+      run: |
+        cat > upload.py << 'EOF'
+        import os
+        import json
+        from google.oauth2 import service_account
+        from googleapiclient.discovery import build
+        from googleapiclient.http import MediaFileUpload
+
+        # Load service account credentials
+        creds_data = json.loads(os.environ['SERVICE_ACCOUNT_KEY'])
+        SCOPES = ['https://www.googleapis.com/auth/drive.file']
+        creds = service_account.Credentials.from_service_account_info(
+            creds_data, scopes=SCOPES
+        )
+
+        # Build Drive service
+        service = build('drive', 'v3', credentials=creds)
+
+        # File to upload
+        file_name = os.environ['FILE_NAME']
+        
+        file_metadata = {'name': file_name}
+
+        # Upload file
+        print(f"📤 Uploading {file_name}...")
+        media = MediaFileUpload(file_name, resumable=True)
+        file = service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields='id, name, webViewLink'
+        ).execute()
+
+        print(f"✅ Upload berhasil!")
+        print(f"📁 File: {file.get('name')}")
+        print(f"🆔 File ID: {file.get('id')}")
+        print(f"🔗 Link: {file.get('webViewLink')}")
+        
+        # Set file permission to anyone with link can view
+        permission = {
+            'type': 'anyone',
+            'role': 'reader'
+        }
+        service.permissions().create(
+            fileId=file.get('id'),
+            body=permission
+        ).execute()
+        print("🔓 File dapat diakses oleh siapa saja dengan link")
+        EOF
+
+        python upload.py
+    
+    - name: Cleanup
+      if: always()
+      run: |
+        rm -f "${{ env.FILE_NAME }}" upload.py

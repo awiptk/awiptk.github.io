@@ -11,6 +11,10 @@ on:
         description: 'Nama file (opsional, kosongkan untuk otomatis)'
         required: false
         type: string
+      folder_id:
+        description: 'Google Drive Folder ID (WAJIB diisi!)'
+        required: true
+        type: string
 
 jobs:
   upload:
@@ -43,6 +47,7 @@ jobs:
     - name: Upload to Google Drive
       env:
         SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
+        FOLDER_ID: ${{ inputs.folder_id }}
       run: |
         cat > upload.py << 'EOF'
         import os
@@ -63,33 +68,41 @@ jobs:
 
         # File to upload
         file_name = os.environ['FILE_NAME']
+        folder_id = os.environ['FOLDER_ID']
         
-        file_metadata = {'name': file_name}
+        file_metadata = {
+            'name': file_name,
+            'parents': [folder_id]
+        }
 
         # Upload file
-        print(f"📤 Uploading {file_name}...")
+        print(f"📤 Uploading {file_name} to folder {folder_id}...")
         media = MediaFileUpload(file_name, resumable=True)
         file = service.files().create(
             body=file_metadata,
             media_body=media,
-            fields='id, name, webViewLink'
+            fields='id, name, webViewLink, parents'
         ).execute()
 
         print(f"✅ Upload berhasil!")
         print(f"📁 File: {file.get('name')}")
         print(f"🆔 File ID: {file.get('id')}")
+        print(f"📂 Parent Folder: {file.get('parents')}")
         print(f"🔗 Link: {file.get('webViewLink')}")
         
         # Set file permission to anyone with link can view
-        permission = {
-            'type': 'anyone',
-            'role': 'reader'
-        }
-        service.permissions().create(
-            fileId=file.get('id'),
-            body=permission
-        ).execute()
-        print("🔓 File dapat diakses oleh siapa saja dengan link")
+        try:
+            permission = {
+                'type': 'anyone',
+                'role': 'reader'
+            }
+            service.permissions().create(
+                fileId=file.get('id'),
+                body=permission
+            ).execute()
+            print("🔓 File dapat diakses oleh siapa saja dengan link")
+        except Exception as e:
+            print(f"⚠️ Tidak bisa set public permission: {e}")
         EOF
 
         python upload.py

@@ -1,71 +1,290 @@
 <!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
-<meta charset="UTF-8">
-<title>Upload File dari URL ke Google Drive</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload File ke Google Drive</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 600px;
+            width: 100%;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        button {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 10px;
+        }
+        .btn-login {
+            background: #4285f4;
+            color: white;
+        }
+        .btn-login:hover {
+            background: #357ae8;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(66, 133, 244, 0.4);
+        }
+        .btn-upload {
+            background: #34a853;
+            color: white;
+        }
+        .btn-upload:hover {
+            background: #2d8e47;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 168, 83, 0.4);
+        }
+        .btn-upload:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-size: 14px;
+            display: none;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .user-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .user-info strong {
+            color: #333;
+        }
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-left: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
 </head>
 <body>
-<h2>Upload File via URL ke Google Drive</h2>
+    <div class="container">
+        <h1>📤 Upload File ke Google Drive</h1>
+        <p class="subtitle">Upload file dari URL langsung ke Google Drive Anda</p>
+        
+        <button id="loginBtn" class="btn-login">🔐 Login dengan Google</button>
+        
+        <div id="userInfo" class="user-info">
+            <strong>Akun:</strong> <span id="userName"></span>
+        </div>
+        
+        <div id="uploadForm" style="display: none;">
+            <div class="input-group">
+                <label for="fileUrl">URL File:</label>
+                <input type="text" id="fileUrl" placeholder="https://example.com/file.pdf" />
+            </div>
+            
+            <div class="input-group">
+                <label for="fileName">Nama File (opsional):</label>
+                <input type="text" id="fileName" placeholder="Kosongkan untuk menggunakan nama asli" />
+            </div>
+            
+            <button id="uploadBtn" class="btn-upload">📁 Upload ke Drive</button>
+        </div>
+        
+        <div id="status" class="status"></div>
+    </div>
 
-<input type="text" id="fileUrl" placeholder="Masukkan URL file" style="width:400px">
-<button id="uploadBtn">Upload ke Drive</button>
-
-<script src="https://apis.google.com/js/api.js"></script>
-<script>
-const CLIENT_ID = '958571020072-3s9rvi1b09qq7c5e5me9hjp2im28qpjr.apps.googleusercontent.com';
-const SCOPES = 'https://www.googleapis.com/auth/drive.file';
-
-gapi.load('client:auth2', () => {
-  gapi.auth2.init({client_id: CLIENT_ID});
-});
-
-async function authenticate() {
-  return gapi.auth2.getAuthInstance()
-    .signIn({scope: SCOPES});
-}
-
-async function loadClient() {
-  return gapi.client.load('https://content.googleapis.com/discovery/v1/apis/drive/v3/rest');
-}
-
-async function uploadFromURL(url) {
-  try {
-    // Gunakan proxy CORS jika URL blokir CORS
-    const proxy = 'https://corsproxy.io/?';
-    const response = await fetch(proxy + encodeURIComponent(url));
-    const blob = await response.blob();
-
-    const metadata = { name: url.split('/').pop(), mimeType: blob.type || 'application/octet-stream' };
-    const accessToken = gapi.auth.getToken().access_token;
-
-    const formData = new FormData();
-    formData.append("metadata", new Blob([JSON.stringify(metadata)], {type: "application/json"}));
-    formData.append("file", blob);
-
-    const uploadResponse = await fetch(
-      "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id",
-      {
-        method: "POST",
-        headers: { Authorization: "Bearer " + accessToken },
-        body: formData
-      }
-    );
-
-    const result = await uploadResponse.json();
-    alert("File berhasil di-upload! ID: " + result.id + "\nURL: https://drive.google.com/uc?id=" + result.id + "&export=download");
-  } catch (err) {
-    console.error(err);
-    alert("Gagal upload: " + err.message);
-  }
-}
-
-document.getElementById('uploadBtn').onclick = async () => {
-  const url = document.getElementById('fileUrl').value.trim();
-  if (!url) return alert('Masukkan URL file!');
-  await authenticate();
-  await loadClient();
-  await uploadFromURL(url);
-};
-</script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script>
+        const CLIENT_ID = '958571020072-3s9rvi1b09qq7c5e5me9hjp2im28qpjr.apps.googleusercontent.com';
+        const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+        
+        let accessToken = null;
+        
+        function showStatus(message, type) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+            statusEl.style.display = 'block';
+        }
+        
+        function handleCredentialResponse(response) {
+            accessToken = response.access_token;
+            
+            fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+                headers: { Authorization: `Bearer ${accessToken}` }
+            })
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('userName').textContent = data.email;
+                document.getElementById('userInfo').style.display = 'block';
+                document.getElementById('loginBtn').style.display = 'none';
+                document.getElementById('uploadForm').style.display = 'block';
+                showStatus('Login berhasil! Silakan masukkan URL file.', 'success');
+            })
+            .catch(err => {
+                showStatus('Gagal mengambil info pengguna: ' + err.message, 'error');
+            });
+        }
+        
+        window.onload = function() {
+            google.accounts.oauth2.initTokenClient({
+                client_id: CLIENT_ID,
+                scope: SCOPES,
+                callback: handleCredentialResponse
+            });
+            
+            document.getElementById('loginBtn').onclick = function() {
+                const tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: CLIENT_ID,
+                    scope: SCOPES,
+                    callback: handleCredentialResponse
+                });
+                tokenClient.requestAccessToken();
+            };
+            
+            document.getElementById('uploadBtn').onclick = uploadFile;
+        };
+        
+        async function uploadFile() {
+            const fileUrl = document.getElementById('fileUrl').value.trim();
+            const fileName = document.getElementById('fileName').value.trim();
+            
+            if (!fileUrl) {
+                showStatus('Harap masukkan URL file!', 'error');
+                return;
+            }
+            
+            if (!accessToken) {
+                showStatus('Harap login terlebih dahulu!', 'error');
+                return;
+            }
+            
+            const uploadBtn = document.getElementById('uploadBtn');
+            uploadBtn.disabled = true;
+            uploadBtn.innerHTML = '⏳ Mengunduh file...';
+            
+            try {
+                showStatus('Mengunduh file dari URL...', 'info');
+                
+                const response = await fetch(fileUrl);
+                if (!response.ok) throw new Error('Gagal mengunduh file dari URL');
+                
+                const blob = await response.blob();
+                const finalFileName = fileName || fileUrl.split('/').pop().split('?')[0] || 'file';
+                
+                uploadBtn.innerHTML = '⏳ Mengupload ke Drive...';
+                showStatus('Mengupload file ke Google Drive...', 'info');
+                
+                const metadata = {
+                    name: finalFileName,
+                    mimeType: blob.type || 'application/octet-stream'
+                };
+                
+                const form = new FormData();
+                form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+                form.append('file', blob);
+                
+                const uploadResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`
+                    },
+                    body: form
+                });
+                
+                if (!uploadResponse.ok) {
+                    const errorData = await uploadResponse.json();
+                    throw new Error(errorData.error?.message || 'Upload gagal');
+                }
+                
+                const result = await uploadResponse.json();
+                showStatus(`✅ File berhasil diupload! ID: ${result.id}`, 'success');
+                
+                document.getElementById('fileUrl').value = '';
+                document.getElementById('fileName').value = '';
+                
+            } catch (error) {
+                showStatus('❌ Error: ' + error.message, 'error');
+            } finally {
+                uploadBtn.disabled = false;
+                uploadBtn.innerHTML = '📁 Upload ke Drive';
+            }
+        }
+    </script>
 </body>
   </html>

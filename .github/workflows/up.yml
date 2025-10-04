@@ -7,6 +7,10 @@ on:
         description: 'URL YouTube video (contoh: https://youtube.com/watch?v=xxxxx)'
         required: true
         type: string
+      youtube_cookies:
+        description: 'YouTube Cookies (opsional, dalam format: COOKIE1=value1; COOKIE2=value2)'
+        required: false
+        type: string
       destination_folder:
         description: 'Folder tujuan di repo (contoh: audio)'
         required: true
@@ -62,14 +66,35 @@ jobs:
           echo "✅ yt-dlp version:"
           yt-dlp --version
 
-      - name: Setup cookies (if available)
+      - name: Setup cookies
         run: |
-          if [ -n "${{ secrets.YOUTUBE_COOKIES }}" ]; then
-            echo "🍪 Setting up YouTube cookies..."
+          # Cek cookies dari input atau secrets
+          if [ -n "${{ inputs.youtube_cookies }}" ]; then
+            echo "🍪 Converting cookies from input..."
+            
+            # Convert format cookies browser ke Netscape format
+            cat > cookies.txt << 'EOF'
+          # Netscape HTTP Cookie File
+          .youtube.com	TRUE	/	TRUE	2147483647	CONSENT	YES+cb
+          EOF
+            
+            # Parse cookies dari input (format: KEY=VALUE; KEY2=VALUE2)
+            echo "${{ inputs.youtube_cookies }}" | tr ';' '\n' | while IFS='=' read -r key value; do
+              key=$(echo "$key" | xargs)
+              value=$(echo "$value" | xargs)
+              if [ -n "$key" ] && [ -n "$value" ]; then
+                echo ".youtube.com	TRUE	/	TRUE	2147483647	$key	$value" >> cookies.txt
+              fi
+            done
+            
+            echo "✅ Cookies file created from input"
+            
+          elif [ -n "${{ secrets.YOUTUBE_COOKIES }}" ]; then
+            echo "🍪 Using cookies from secrets..."
             echo "${{ secrets.YOUTUBE_COOKIES }}" > cookies.txt
-            echo "✅ Cookies file created"
+            echo "✅ Cookies file created from secrets"
           else
-            echo "⚠️ No cookies found - attempting without authentication"
+            echo "⚠️ No cookies provided - will attempt without authentication"
           fi
 
       - name: Download audio from YouTube
@@ -84,49 +109,42 @@ jobs:
           
           mkdir -p "${{ inputs.destination_folder }}"
           
-          # Siapkan opsi yt-dlp
-          YTDLP_OPTS="--no-check-certificates --user-agent 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'"
+          echo "⬇️ Downloading audio..."
+          
+          # Opsi dasar yt-dlp
+          YTDLP_CMD="yt-dlp -x --audio-format ${{ inputs.audio_format }}"
+          
+          # Tambahkan quality
+          if [ "${{ inputs.audio_quality }}" = "best" ]; then
+            YTDLP_CMD="$YTDLP_CMD --audio-quality 0"
+          else
+            YTDLP_CMD="$YTDLP_CMD --audio-quality ${{ inputs.audio_quality }}"
+          fi
+          
+          # Tambahkan opsi lain
+          YTDLP_CMD="$YTDLP_CMD --no-playlist --no-check-certificates"
+          YTDLP_CMD="$YTDLP_CMD --extractor-args 'youtube:player_client=android'"
           
           # Tambahkan cookies jika ada
           if [ -f cookies.txt ]; then
-            YTDLP_OPTS="$YTDLP_OPTS --cookies cookies.txt"
+            YTDLP_CMD="$YTDLP_CMD --cookies cookies.txt"
             echo "🍪 Using cookies for authentication"
           fi
           
-          echo "⬇️ Downloading audio..."
+          # Output filename
+          YTDLP_CMD="$YTDLP_CMD -o '${{ inputs.destination_folder }}/${{ inputs.output_filename }}.%(ext)s'"
           
-          # Download dengan opsi bypass bot detection
-          if [ "${{ inputs.audio_quality }}" = "best" ]; then
-            yt-dlp -x --audio-format ${{ inputs.audio_format }} \
-              --audio-quality 0 \
-              $YTDLP_OPTS \
-              --no-playlist \
-              --extractor-args "youtube:player_client=android" \
-              --extractor-args "youtube:skip=dash,hls" \
-              -o "${{ inputs.destination_folder }}/${{ inputs.output_filename }}.%(ext)s" \
-              "${{ inputs.youtube_url }}" || {
-                echo "❌ yt-dlp download failed!"
-                echo ""
-                echo "💡 Tip: Video mungkin memerlukan cookies YouTube."
-                echo "Lihat instruksi di bawah untuk setup cookies."
-                exit 1
-              }
-          else
-            yt-dlp -x --audio-format ${{ inputs.audio_format }} \
-              --audio-quality ${{ inputs.audio_quality }} \
-              $YTDLP_OPTS \
-              --no-playlist \
-              --extractor-args "youtube:player_client=android" \
-              --extractor-args "youtube:skip=dash,hls" \
-              -o "${{ inputs.destination_folder }}/${{ inputs.output_filename }}.%(ext)s" \
-              "${{ inputs.youtube_url }}" || {
-                echo "❌ yt-dlp download failed!"
-                echo ""
-                echo "💡 Tip: Video mungkin memerlukan cookies YouTube."
-                echo "Lihat instruksi di bawah untuk setup cookies."
-                exit 1
-              }
-          fi
+          # Jalankan download
+          eval $YTDLP_CMD "'${{ inputs.youtube_url }}'" || {
+            echo ""
+            echo "❌ Download failed!"
+            echo ""
+            if [ ! -f cookies.txt ]; then
+              echo "💡 Tip: Video ini mungkin memerlukan cookies YouTube."
+              echo "Coba masukkan cookies di field 'YouTube Cookies' saat run workflow."
+            fi
+            exit 1
+          }
           
           echo ""
           echo "✅ Download completed!"
@@ -142,20 +160,26 @@ jobs:
       - name: Verify downloaded file
         run: |
           echo "📂 Checking folder contents..."
-          ls -la "${{ inputs.destination_folder }}/"
+          ls -la "${{ inputs.destination_folder }}/" || true
           
           echo ""
           echo "🔍 Looking for downloaded file..."
           
           # Cari file yang baru di-download
-          if [ -f "${{ inputs.destination_folder }}/${{ inputs.output_filename }}.${{ inputs.audio_format }}" ]; then
-            FILE="${{ inputs.destination_folder }}/${{ inputs.output_filename }}.${{ inputs.audio_format }}"
-          else
+          FILE=$(find "${{ inputs.destination_folder }}" -name "${{ inputs.output_filename }}*" -type f -newer /proc/1/stat 2>/dev/null | head -n 1)
+          
+          if [ -z "$FILE" ]; then
+            # Fallback: cari file dengan nama yang sesuai
             FILE=$(find "${{ inputs.destination_folder }}" -name "${{ inputs.output_filename }}*" -type f | head -n 1)
           fi
           
           if [ -z "$FILE" ] || [ ! -f "$FILE" ]; then
             echo "❌ Error: File not found!"
+            echo ""
+            echo "Expected pattern: ${{ inputs.destination_folder }}/${{ inputs.output_filename }}*"
+            echo ""
+            echo "Files in directory:"
+            find "${{ inputs.destination_folder }}" -type f 2>/dev/null || echo "No files found"
             exit 1
           fi
           
@@ -163,12 +187,14 @@ jobs:
           ls -lh "$FILE"
           
           FILE_SIZE=$(stat -c%s "$FILE")
+          FILE_SIZE_KB=$(echo "scale=0; $FILE_SIZE / 1024" | bc)
           FILE_SIZE_MB=$(echo "scale=2; $FILE_SIZE / 1024 / 1024" | bc)
           
-          echo "File size: $FILE_SIZE bytes ($FILE_SIZE_MB MB)"
+          echo "File size: $FILE_SIZE bytes ($FILE_SIZE_KB KB / $FILE_SIZE_MB MB)"
           
-          if [ "$FILE_SIZE" -lt 1000 ]; then
-            echo "❌ Error: File too small"
+          if [ "$FILE_SIZE" -lt 10000 ]; then
+            echo "❌ Error: File too small (< 10KB), likely failed download"
+            cat "$FILE" 2>/dev/null || true
             exit 1
           fi
           
@@ -182,13 +208,21 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
+          echo "📝 Adding files to git..."
           git add "${{ inputs.destination_folder }}/"
+          
+          echo "📊 Git status:"
+          git status --short
           
           if git diff --staged --quiet; then
             echo "⚠️ No changes to commit"
           else
+            echo "💾 Committing changes..."
             git commit -m "🎵 Add audio: ${{ inputs.output_filename }}"
+            
+            echo "📤 Pushing to repository..."
             git push
+            
             echo "✅ Changes pushed successfully!"
           fi
 
@@ -209,17 +243,4 @@ jobs:
           else
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "❌ **Status:** Failed" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "---" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "### 🍪 Cara Setup YouTube Cookies (Opsional)" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Jika video memerlukan login YouTube:" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "1. Install extension **Get cookies.txt LOCALLY** di browser" >> $GITHUB_STEP_SUMMARY
-            echo "2. Login ke YouTube" >> $GITHUB_STEP_SUMMARY
-            echo "3. Klik extension dan export cookies untuk youtube.com" >> $GITHUB_STEP_SUMMARY
-            echo "4. Buka **Settings → Secrets and variables → Actions**" >> $GITHUB_STEP_SUMMARY
-            echo "5. Buat secret baru bernama \`YOUTUBE_COOKIES\`" >> $GITHUB_STEP_SUMMARY
-            echo "6. Paste isi file cookies.txt" >> $GITHUB_STEP_SUMMARY
           fi

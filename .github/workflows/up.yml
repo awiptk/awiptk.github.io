@@ -54,51 +54,107 @@ jobs:
 
       - name: Install yt-dlp and ffmpeg
         run: |
-          pip install yt-dlp
+          echo "📦 Installing dependencies..."
+          pip install -U yt-dlp
           sudo apt-get update
           sudo apt-get install -y ffmpeg
+          
+          echo "✅ yt-dlp version:"
+          yt-dlp --version
+          
+          echo "✅ ffmpeg version:"
+          ffmpeg -version | head -n 1
 
       - name: Download audio from YouTube
         run: |
-          echo "🎵 Downloading audio from: ${{ inputs.youtube_url }}"
-          echo "📁 Destination: ${{ inputs.destination_folder }}"
-          echo "📝 Filename: ${{ inputs.output_filename }}"
-          echo "🎼 Format: ${{ inputs.audio_format }}"
-          echo "⚡ Quality: ${{ inputs.audio_quality }}"
+          echo "🎵 Starting download..."
+          echo "URL: ${{ inputs.youtube_url }}"
+          echo "Destination: ${{ inputs.destination_folder }}"
+          echo "Filename: ${{ inputs.output_filename }}"
+          echo "Format: ${{ inputs.audio_format }}"
+          echo "Quality: ${{ inputs.audio_quality }}"
+          echo ""
           
           mkdir -p "${{ inputs.destination_folder }}"
           
-          # Download dengan yt-dlp
+          # Cek info video dulu
+          echo "📹 Checking video info..."
+          yt-dlp --print title "${{ inputs.youtube_url }}" || {
+            echo "❌ Error: Cannot access video. Check if URL is correct and video is available."
+            exit 1
+          }
+          
+          echo ""
+          echo "⬇️ Downloading audio..."
+          
+          # Download dengan verbose output
           if [ "${{ inputs.audio_quality }}" = "best" ]; then
             yt-dlp -x --audio-format ${{ inputs.audio_format }} \
               --audio-quality 0 \
+              --verbose \
+              --no-playlist \
               -o "${{ inputs.destination_folder }}/${{ inputs.output_filename }}.%(ext)s" \
-              "${{ inputs.youtube_url }}"
+              "${{ inputs.youtube_url }}" || {
+                echo "❌ yt-dlp download failed!"
+                exit 1
+              }
           else
             yt-dlp -x --audio-format ${{ inputs.audio_format }} \
               --audio-quality ${{ inputs.audio_quality }} \
+              --verbose \
+              --no-playlist \
               -o "${{ inputs.destination_folder }}/${{ inputs.output_filename }}.%(ext)s" \
-              "${{ inputs.youtube_url }}"
+              "${{ inputs.youtube_url }}" || {
+                echo "❌ yt-dlp download failed!"
+                exit 1
+              }
           fi
           
+          echo ""
           echo "✅ Download completed!"
 
       - name: Verify downloaded file
         run: |
-          echo "📊 File information:"
-          ls -lh "${{ inputs.destination_folder }}/${{ inputs.output_filename }}."*
+          echo "📂 Checking folder contents..."
+          ls -la "${{ inputs.destination_folder }}/"
+          
+          echo ""
+          echo "🔍 Looking for downloaded file..."
+          
+          # Cari file yang baru di-download
+          if [ -f "${{ inputs.destination_folder }}/${{ inputs.output_filename }}.${{ inputs.audio_format }}" ]; then
+            FILE="${{ inputs.destination_folder }}/${{ inputs.output_filename }}.${{ inputs.audio_format }}"
+          else
+            # Cari file dengan pattern yang mirip
+            FILE=$(find "${{ inputs.destination_folder }}" -name "${{ inputs.output_filename }}*" -type f | head -n 1)
+          fi
+          
+          if [ -z "$FILE" ] || [ ! -f "$FILE" ]; then
+            echo "❌ Error: File not found!"
+            echo "Expected: ${{ inputs.destination_folder }}/${{ inputs.output_filename }}.${{ inputs.audio_format }}"
+            echo ""
+            echo "Files in directory:"
+            find "${{ inputs.destination_folder }}" -type f
+            exit 1
+          fi
+          
+          echo "📊 File found: $FILE"
+          ls -lh "$FILE"
           
           # Cek ukuran file
-          FILE=$(ls "${{ inputs.destination_folder }}/${{ inputs.output_filename }}."*)
           FILE_SIZE=$(stat -c%s "$FILE")
           FILE_SIZE_MB=$(echo "scale=2; $FILE_SIZE / 1024 / 1024" | bc)
           
           echo "File size: $FILE_SIZE bytes ($FILE_SIZE_MB MB)"
           
-          if [ "$FILE_SIZE" -eq 0 ]; then
-            echo "❌ Error: File berukuran 0 KB"
+          if [ "$FILE_SIZE" -lt 1000 ]; then
+            echo "❌ Error: File too small (likely failed download)"
             exit 1
           fi
+          
+          # Simpan info file untuk step berikutnya
+          echo "AUDIO_FILE=$FILE" >> $GITHUB_ENV
+          echo "FILE_SIZE_MB=$FILE_SIZE_MB" >> $GITHUB_ENV
           
           echo "✅ File verification passed"
 
@@ -106,21 +162,40 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          echo "📝 Staging files..."
           git add "${{ inputs.destination_folder }}/"
-          git commit -m "🎵 Add audio: ${{ inputs.output_filename }} from YouTube" || echo "⚠️ No changes to commit"
-          git push
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+          echo "📊 Git status:"
+          git status
+          
+          if git diff --staged --quiet; then
+            echo "⚠️ No changes to commit"
+          else
+            echo "💾 Committing changes..."
+            git commit -m "🎵 Add audio: ${{ inputs.output_filename }} from YouTube"
+            
+            echo "📤 Pushing to repository..."
+            git push
+            
+            echo "✅ Changes pushed successfully!"
+          fi
 
       - name: Summary
+        if: always()
         run: |
           echo "### 🎉 Download Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Source:** ${{ inputs.youtube_url }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Format:** ${{ inputs.audio_format }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Quality:** ${{ inputs.audio_quality }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Location:** \`${{ inputs.destination_folder }}/${{ inputs.output_filename }}.${{ inputs.audio_format }}\`" >> $GITHUB_STEP_SUMMARY
-          FILE=$(ls "${{ inputs.destination_folder }}/${{ inputs.output_filename }}."*)
-          FILE_SIZE=$(stat -c%s "$FILE")
-          FILE_SIZE_MB=$(echo "scale=2; $FILE_SIZE / 1024 / 1024" | bc)
-          echo "- **Size:** $FILE_SIZE_MB MB" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -n "$AUDIO_FILE" ]; then
+            echo "- **Location:** \`$AUDIO_FILE\`" >> $GITHUB_STEP_SUMMARY
+            echo "- **Size:** $FILE_SIZE_MB MB" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "✅ **Status:** Success" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **Status:** Failed - File not found" >> $GITHUB_STEP_SUMMARY
+          fi

@@ -1,10 +1,10 @@
-name: Upload File from URL to Repo
+name: Download YouTube Audio to Repo
 
 on:
   workflow_dispatch:
     inputs:
-      file_url:
-        description: 'URL file yang ingin diunduh (contoh: https://example.com/audio.mp3)'
+      youtube_url:
+        description: 'URL YouTube video (contoh: https://youtube.com/watch?v=xxxxx)'
         required: true
         type: string
       destination_folder:
@@ -13,10 +13,31 @@ on:
         default: 'audio'
         type: string
       output_filename:
-        description: 'Nama file output di repo (contoh: lagu.mp3)'
+        description: 'Nama file output tanpa ekstensi (contoh: lagu-favorit)'
         required: true
-        default: 'file.mp3'
+        default: 'audio'
         type: string
+      audio_format:
+        description: 'Format audio (mp3, m4a, wav, opus)'
+        required: true
+        default: 'mp3'
+        type: choice
+        options:
+          - mp3
+          - m4a
+          - wav
+          - opus
+      audio_quality:
+        description: 'Kualitas audio (best, 320K, 256K, 192K, 128K)'
+        required: true
+        default: 'best'
+        type: choice
+        options:
+          - best
+          - 320K
+          - 256K
+          - 192K
+          - 128K
 
 jobs:
   download-and-commit:
@@ -26,20 +47,80 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Download file from URL
-        run: |
-          echo "URL: ${{ inputs.file_url }}"
-          echo "Folder: ${{ inputs.destination_folder }}"
-          echo "Output filename: ${{ inputs.output_filename }}"
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
 
+      - name: Install yt-dlp and ffmpeg
+        run: |
+          pip install yt-dlp
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Download audio from YouTube
+        run: |
+          echo "🎵 Downloading audio from: ${{ inputs.youtube_url }}"
+          echo "📁 Destination: ${{ inputs.destination_folder }}"
+          echo "📝 Filename: ${{ inputs.output_filename }}"
+          echo "🎼 Format: ${{ inputs.audio_format }}"
+          echo "⚡ Quality: ${{ inputs.audio_quality }}"
+          
           mkdir -p "${{ inputs.destination_folder }}"
-          curl -L -o "${{ inputs.destination_folder }}/${{ inputs.output_filename }}" "${{ inputs.file_url }}"
-          echo "✅ File downloaded to ${{ inputs.destination_folder }}/${{ inputs.output_filename }}"
+          
+          # Download dengan yt-dlp
+          if [ "${{ inputs.audio_quality }}" = "best" ]; then
+            yt-dlp -x --audio-format ${{ inputs.audio_format }} \
+              --audio-quality 0 \
+              -o "${{ inputs.destination_folder }}/${{ inputs.output_filename }}.%(ext)s" \
+              "${{ inputs.youtube_url }}"
+          else
+            yt-dlp -x --audio-format ${{ inputs.audio_format }} \
+              --audio-quality ${{ inputs.audio_quality }} \
+              -o "${{ inputs.destination_folder }}/${{ inputs.output_filename }}.%(ext)s" \
+              "${{ inputs.youtube_url }}"
+          fi
+          
+          echo "✅ Download completed!"
+
+      - name: Verify downloaded file
+        run: |
+          echo "📊 File information:"
+          ls -lh "${{ inputs.destination_folder }}/${{ inputs.output_filename }}."*
+          
+          # Cek ukuran file
+          FILE=$(ls "${{ inputs.destination_folder }}/${{ inputs.output_filename }}."*)
+          FILE_SIZE=$(stat -c%s "$FILE")
+          FILE_SIZE_MB=$(echo "scale=2; $FILE_SIZE / 1024 / 1024" | bc)
+          
+          echo "File size: $FILE_SIZE bytes ($FILE_SIZE_MB MB)"
+          
+          if [ "$FILE_SIZE" -eq 0 ]; then
+            echo "❌ Error: File berukuran 0 KB"
+            exit 1
+          fi
+          
+          echo "✅ File verification passed"
 
       - name: Commit and push changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add "${{ inputs.destination_folder }}/${{ inputs.output_filename }}"
-          git commit -m "Upload file from URL: ${{ inputs.file_url }}" || echo "⚠️ No changes to commit"
+          git add "${{ inputs.destination_folder }}/"
+          git commit -m "🎵 Add audio: ${{ inputs.output_filename }} from YouTube" || echo "⚠️ No changes to commit"
           git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        run: |
+          echo "### 🎉 Download Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Source:** ${{ inputs.youtube_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Format:** ${{ inputs.audio_format }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Quality:** ${{ inputs.audio_quality }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Location:** \`${{ inputs.destination_folder }}/${{ inputs.output_filename }}.${{ inputs.audio_format }}\`" >> $GITHUB_STEP_SUMMARY
+          FILE=$(ls "${{ inputs.destination_folder }}/${{ inputs.output_filename }}."*)
+          FILE_SIZE=$(stat -c%s "$FILE")
+          FILE_SIZE_MB=$(echo "scale=2; $FILE_SIZE / 1024 / 1024" | bc)
+          echo "- **Size:** $FILE_SIZE_MB MB" >> $GITHUB_STEP_SUMMARY

@@ -123,13 +123,21 @@ jobs:
           
           # Tambahkan opsi lain
           YTDLP_CMD="$YTDLP_CMD --no-playlist --no-check-certificates"
-          YTDLP_CMD="$YTDLP_CMD --extractor-args 'youtube:player_client=android'"
           
           # Tambahkan cookies jika ada
           if [ -f cookies.txt ]; then
             YTDLP_CMD="$YTDLP_CMD --cookies cookies.txt"
-            echo "🍪 Using cookies for authentication"
+            # Gunakan web client jika pakai cookies
+            YTDLP_CMD="$YTDLP_CMD --extractor-args 'youtube:player_client=web'"
+            echo "🍪 Using cookies with web client"
+          else
+            # Gunakan android client jika tanpa cookies
+            YTDLP_CMD="$YTDLP_CMD --extractor-args 'youtube:player_client=android'"
+            echo "📱 Using android client (no cookies)"
           fi
+          
+          # Tambahkan opsi format fallback
+          YTDLP_CMD="$YTDLP_CMD --format 'bestaudio/best'"
           
           # Output filename
           YTDLP_CMD="$YTDLP_CMD -o '${{ inputs.destination_folder }}/${{ inputs.output_filename }}.%(ext)s'"

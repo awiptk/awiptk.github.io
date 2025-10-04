@@ -1,256 +1,146 @@
-name: Download YouTube Audio to Repo
+name: Download File from URL
 
 on:
   workflow_dispatch:
     inputs:
-      youtube_url:
-        description: 'URL YouTube video (contoh: https://youtube.com/watch?v=xxxxx)'
+      file_url:
+        description: 'URL file yang ingin diunduh'
         required: true
         type: string
-      youtube_cookies:
-        description: 'YouTube Cookies (opsional, dalam format: COOKIE1=value1; COOKIE2=value2)'
-        required: false
-        type: string
       destination_folder:
-        description: 'Folder tujuan di repo (contoh: audio)'
+        description: 'Folder tujuan di repo'
         required: true
         default: 'audio'
         type: string
       output_filename:
-        description: 'Nama file output tanpa ekstensi (contoh: lagu-favorit)'
+        description: 'Nama file output (dengan ekstensi, contoh: lagu.mp3)'
         required: true
-        default: 'audio'
+        default: 'audio.mp3'
         type: string
-      audio_format:
-        description: 'Format audio (mp3, m4a, wav, opus)'
-        required: true
-        default: 'mp3'
-        type: choice
-        options:
-          - mp3
-          - m4a
-          - wav
-          - opus
-      audio_quality:
-        description: 'Kualitas audio (best, 320K, 256K, 192K, 128K)'
-        required: true
-        default: 'best'
-        type: choice
-        options:
-          - best
-          - 320K
-          - 256K
-          - 192K
-          - 128K
 
 jobs:
   download-and-commit:
     runs-on: ubuntu-latest
-
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'
-
-      - name: Install yt-dlp and ffmpeg
+      - name: Download file from URL
         run: |
-          echo "📦 Installing dependencies..."
-          pip install -U yt-dlp
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
-          
-          echo "✅ yt-dlp version:"
-          yt-dlp --version
-
-      - name: Setup cookies
-        run: |
-          # Cek cookies dari input atau secrets
-          if [ -n "${{ inputs.youtube_cookies }}" ]; then
-            echo "🍪 Converting cookies from input..."
-            
-            # Convert format cookies browser ke Netscape format
-            cat > cookies.txt << 'EOF'
-          # Netscape HTTP Cookie File
-          .youtube.com	TRUE	/	TRUE	2147483647	CONSENT	YES+cb
-          EOF
-            
-            # Parse cookies dari input (format: KEY=VALUE; KEY2=VALUE2)
-            echo "${{ inputs.youtube_cookies }}" | tr ';' '\n' | while IFS='=' read -r key value; do
-              key=$(echo "$key" | xargs)
-              value=$(echo "$value" | xargs)
-              if [ -n "$key" ] && [ -n "$value" ]; then
-                echo ".youtube.com	TRUE	/	TRUE	2147483647	$key	$value" >> cookies.txt
-              fi
-            done
-            
-            echo "✅ Cookies file created from input"
-            
-          elif [ -n "${{ secrets.YOUTUBE_COOKIES }}" ]; then
-            echo "🍪 Using cookies from secrets..."
-            echo "${{ secrets.YOUTUBE_COOKIES }}" > cookies.txt
-            echo "✅ Cookies file created from secrets"
-          else
-            echo "⚠️ No cookies provided - will attempt without authentication"
-          fi
-
-      - name: Download audio from YouTube
-        run: |
-          echo "🎵 Starting download..."
-          echo "URL: ${{ inputs.youtube_url }}"
-          echo "Destination: ${{ inputs.destination_folder }}"
-          echo "Filename: ${{ inputs.output_filename }}"
-          echo "Format: ${{ inputs.audio_format }}"
-          echo "Quality: ${{ inputs.audio_quality }}"
+          echo "🔗 Downloading from URL..."
+          echo "Source: ${{ inputs.file_url }}"
+          echo "Destination: ${{ inputs.destination_folder }}/${{ inputs.output_filename }}"
           echo ""
           
+          # Buat folder jika belum ada
           mkdir -p "${{ inputs.destination_folder }}"
           
-          echo "⬇️ Downloading audio..."
-          
-          # Opsi dasar yt-dlp
-          YTDLP_CMD="yt-dlp -x --audio-format ${{ inputs.audio_format }}"
-          
-          # Tambahkan quality
-          if [ "${{ inputs.audio_quality }}" = "best" ]; then
-            YTDLP_CMD="$YTDLP_CMD --audio-quality 0"
-          else
-            YTDLP_CMD="$YTDLP_CMD --audio-quality ${{ inputs.audio_quality }}"
-          fi
-          
-          # Tambahkan opsi lain
-          YTDLP_CMD="$YTDLP_CMD --no-playlist --no-check-certificates"
-          
-          # Tambahkan cookies dan client options
-          if [ -f cookies.txt ]; then
-            YTDLP_CMD="$YTDLP_CMD --cookies cookies.txt"
-            # Coba multiple clients sebagai fallback
-            YTDLP_CMD="$YTDLP_CMD --extractor-args 'youtube:player_client=web,android_creator,ios'"
-            echo "🍪 Using cookies with multiple client fallback"
-          else
-            # Gunakan android client jika tanpa cookies
-            YTDLP_CMD="$YTDLP_CMD --extractor-args 'youtube:player_client=android,ios'"
-            echo "📱 Using android/ios client (no cookies)"
-          fi
-          
-          # Tambahkan opsi format fallback dan geo bypass
-          YTDLP_CMD="$YTDLP_CMD --format 'bestaudio/best'"
-          YTDLP_CMD="$YTDLP_CMD --geo-bypass"
-          YTDLP_CMD="$YTDLP_CMD --add-header 'User-Agent:Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36'"
-          
-          # Output filename
-          YTDLP_CMD="$YTDLP_CMD -o '${{ inputs.destination_folder }}/${{ inputs.output_filename }}.%(ext)s'"
-          
-          # Jalankan download
-          eval $YTDLP_CMD "'${{ inputs.youtube_url }}'" || {
-            echo ""
-            echo "❌ Download failed!"
-            echo ""
-            if [ ! -f cookies.txt ]; then
-              echo "💡 Tip: Video ini mungkin memerlukan cookies YouTube."
-              echo "Coba masukkan cookies di field 'YouTube Cookies' saat run workflow."
-            fi
-            exit 1
-          }
+          # Download dengan curl
+          curl -L --fail --max-time 600 \
+            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
+            -H "Accept: */*" \
+            -H "Accept-Language: en-US,en;q=0.9" \
+            --progress-bar \
+            -o "${{ inputs.destination_folder }}/${{ inputs.output_filename }}" \
+            "${{ inputs.file_url }}" || {
+              echo ""
+              echo "❌ Download failed!"
+              echo ""
+              echo "Possible reasons:"
+              echo "- URL expired or invalid"
+              echo "- Network timeout"
+              echo "- File requires authentication"
+              exit 1
+            }
           
           echo ""
           echo "✅ Download completed!"
 
-      - name: Cleanup cookies
-        if: always()
-        run: |
-          if [ -f cookies.txt ]; then
-            rm -f cookies.txt
-            echo "🧹 Cookies cleaned up"
-          fi
-
       - name: Verify downloaded file
         run: |
-          echo "📂 Checking folder contents..."
-          ls -la "${{ inputs.destination_folder }}/" || true
+          FILE_PATH="${{ inputs.destination_folder }}/${{ inputs.output_filename }}"
           
-          echo ""
-          echo "🔍 Looking for downloaded file..."
+          echo "📊 File information:"
+          ls -lh "$FILE_PATH"
           
-          # Cari file yang baru di-download
-          FILE=$(find "${{ inputs.destination_folder }}" -name "${{ inputs.output_filename }}*" -type f -newer /proc/1/stat 2>/dev/null | head -n 1)
-          
-          if [ -z "$FILE" ]; then
-            # Fallback: cari file dengan nama yang sesuai
-            FILE=$(find "${{ inputs.destination_folder }}" -name "${{ inputs.output_filename }}*" -type f | head -n 1)
-          fi
-          
-          if [ -z "$FILE" ] || [ ! -f "$FILE" ]; then
-            echo "❌ Error: File not found!"
-            echo ""
-            echo "Expected pattern: ${{ inputs.destination_folder }}/${{ inputs.output_filename }}*"
-            echo ""
-            echo "Files in directory:"
-            find "${{ inputs.destination_folder }}" -type f 2>/dev/null || echo "No files found"
-            exit 1
-          fi
-          
-          echo "📊 File found: $FILE"
-          ls -lh "$FILE"
-          
-          FILE_SIZE=$(stat -c%s "$FILE")
+          # Cek ukuran file
+          FILE_SIZE=$(stat -c%s "$FILE_PATH")
           FILE_SIZE_KB=$(echo "scale=0; $FILE_SIZE / 1024" | bc)
           FILE_SIZE_MB=$(echo "scale=2; $FILE_SIZE / 1024 / 1024" | bc)
           
-          echo "File size: $FILE_SIZE bytes ($FILE_SIZE_KB KB / $FILE_SIZE_MB MB)"
+          echo ""
+          echo "File size: $FILE_SIZE bytes"
+          echo "File size: $FILE_SIZE_KB KB"
+          echo "File size: $FILE_SIZE_MB MB"
           
-          if [ "$FILE_SIZE" -lt 10000 ]; then
-            echo "❌ Error: File too small (< 10KB), likely failed download"
-            cat "$FILE" 2>/dev/null || true
+          # Validasi ukuran minimum (10 KB)
+          if [ "$FILE_SIZE" -lt 10240 ]; then
+            echo ""
+            echo "❌ Error: File too small (< 10 KB)"
+            echo "File might be an error page or incomplete download"
+            echo ""
+            echo "File content preview:"
+            head -c 500 "$FILE_PATH"
             exit 1
           fi
           
-          echo "AUDIO_FILE=$FILE" >> $GITHUB_ENV
-          echo "FILE_SIZE_MB=$FILE_SIZE_MB" >> $GITHUB_ENV
+          # Cek tipe file
+          echo ""
+          echo "File type:"
+          file "$FILE_PATH"
           
-          echo "✅ File verification passed"
+          # Simpan info untuk summary
+          echo "FILE_SIZE_MB=$FILE_SIZE_MB" >> $GITHUB_ENV
+          echo "FILE_PATH=$FILE_PATH" >> $GITHUB_ENV
+          
+          echo ""
+          echo "✅ File verification passed!"
 
       - name: Commit and push changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
-          echo "📝 Adding files to git..."
-          git add "${{ inputs.destination_folder }}/"
+          echo "📝 Adding file to git..."
+          git add "${{ inputs.destination_folder }}/${{ inputs.output_filename }}"
           
+          echo ""
           echo "📊 Git status:"
           git status --short
           
           if git diff --staged --quiet; then
-            echo "⚠️ No changes to commit"
+            echo ""
+            echo "⚠️ No changes to commit (file might already exist with same content)"
           else
+            echo ""
             echo "💾 Committing changes..."
-            git commit -m "🎵 Add audio: ${{ inputs.output_filename }}"
+            git commit -m "📥 Add file: ${{ inputs.output_filename }}"
             
+            echo ""
             echo "📤 Pushing to repository..."
             git push
             
-            echo "✅ Changes pushed successfully!"
+            echo ""
+            echo "✅ File successfully uploaded to repository!"
           fi
 
       - name: Summary
         if: always()
         run: |
-          echo "### 🎉 Download Summary" >> $GITHUB_STEP_SUMMARY
+          echo "### 📥 Download Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Source:** ${{ inputs.youtube_url }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Format:** ${{ inputs.audio_format }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Quality:** ${{ inputs.audio_quality }}" >> $GITHUB_STEP_SUMMARY
           
-          if [ -n "$AUDIO_FILE" ]; then
-            echo "- **Location:** \`$AUDIO_FILE\`" >> $GITHUB_STEP_SUMMARY
-            echo "- **Size:** $FILE_SIZE_MB MB" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -n "$FILE_PATH" ] && [ -f "$FILE_PATH" ]; then
             echo "✅ **Status:** Success" >> $GITHUB_STEP_SUMMARY
-          else
             echo "" >> $GITHUB_STEP_SUMMARY
+            echo "- **Source URL:** \`${{ inputs.file_url }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "- **Saved to:** \`${{ inputs.destination_folder }}/${{ inputs.output_filename }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "- **File size:** $FILE_SIZE_MB MB" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "🎉 File berhasil diupload ke repository!" >> $GITHUB_STEP_SUMMARY
+          else
             echo "❌ **Status:** Failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Download gagal. Periksa log di atas untuk detail error." >> $GITHUB_STEP_SUMMARY
           fi

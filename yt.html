@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Audio Downloader</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+            text-align: center;
+        }
+
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+            font-family: inherit;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+            font-size: 12px;
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .result.success {
+            background: #d4edda;
+            border: 2px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .result.error {
+            background: #f8d7da;
+            border: 2px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .result.info {
+            background: #d1ecf1;
+            border: 2px solid #bee5eb;
+            color: #0c5460;
+        }
+
+        .info-box {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 5px;
+            font-size: 13px;
+            color: #555;
+        }
+
+        .info-box strong {
+            color: #667eea;
+        }
+
+        .loader {
+            display: none;
+            text-align: center;
+            margin-top: 15px;
+        }
+
+        .loader span {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            background: #667eea;
+            border-radius: 50%;
+            margin: 0 3px;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .loader span:nth-child(1) { animation-delay: -0.32s; }
+        .loader span:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 25px;
+            }
+            .row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎵 YouTube Audio Downloader</h1>
+        <p class="subtitle">Download audio dari YouTube ke repository Anda</p>
+
+        <form id="downloadForm">
+            <div class="form-group">
+                <label for="youtubeUrl">🔗 URL YouTube</label>
+                <input type="text" id="youtubeUrl" placeholder="https://youtube.com/watch?v=..." required>
+            </div>
+
+            <div class="form-group">
+                <label for="cookies">🍪 YouTube Cookies (opsional)</label>
+                <textarea id="cookies" placeholder="Paste cookies di sini jika video memerlukan login...&#10;Format: COOKIE1=value1; COOKIE2=value2"></textarea>
+            </div>
+
+            <div class="row">
+                <div class="form-group">
+                    <label for="format">🎼 Format Audio</label>
+                    <select id="format">
+                        <option value="mp3">MP3</option>
+                        <option value="m4a">M4A</option>
+                        <option value="wav">WAV</option>
+                        <option value="opus">OPUS</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="quality">⚡ Kualitas</label>
+                    <select id="quality">
+                        <option value="best">Best</option>
+                        <option value="320K">320K</option>
+                        <option value="256K">256K</option>
+                        <option value="192K">192K</option>
+                        <option value="128K">128K</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="form-group">
+                    <label for="folder">📁 Folder Tujuan</label>
+                    <input type="text" id="folder" value="audio" placeholder="audio">
+                </div>
+
+                <div class="form-group">
+                    <label for="filename">📝 Nama File</label>
+                    <input type="text" id="filename" value="audio" placeholder="audio">
+                </div>
+            </div>
+
+            <button type="submit" id="submitBtn">🚀 Download Audio</button>
+        </form>
+
+        <div class="loader" id="loader">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+
+        <div class="result" id="result"></div>
+
+        <div class="info-box">
+            <strong>ℹ️ Cara Pakai:</strong><br>
+            1. Paste URL video YouTube<br>
+            2. Isi cookies jika video memerlukan login (opsional)<br>
+            3. Pilih format dan kualitas audio<br>
+            4. Klik "Download Audio"<br>
+            5. Anda akan diarahkan ke GitHub Actions untuk menjalankan workflow
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('downloadForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const loader = document.getElementById('loader');
+        const result = document.getElementById('result');
+
+        // GANTI DENGAN USERNAME DAN REPO ANDA
+        const GITHUB_USERNAME = 'awiptk';
+        const GITHUB_REPO = 'awiptk.github.io';
+        const WORKFLOW_FILE = 'download-audio.yml'; // nama file workflow Anda
+
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const youtubeUrl = document.getElementById('youtubeUrl').value.trim();
+            const cookies = document.getElementById('cookies').value.trim();
+            const format = document.getElementById('format').value;
+            const quality = document.getElementById('quality').value;
+            const folder = document.getElementById('folder').value.trim() || 'audio';
+            const filename = document.getElementById('filename').value.trim() || 'audio';
+
+            if (!youtubeUrl) {
+                showResult('error', '❌ URL YouTube tidak boleh kosong!');
+                return;
+            }
+
+            // Validasi URL YouTube
+            const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/;
+            if (!youtubeRegex.test(youtubeUrl)) {
+                showResult('error', '❌ URL tidak valid! Pastikan URL dari YouTube.');
+                return;
+            }
+
+            showResult('info', '🔄 Membuka GitHub Actions...');
+            
+            // Build GitHub Actions URL dengan pre-filled inputs
+            const baseUrl = `https://github.com/${GITHUB_USERNAME}/${GITHUB_REPO}/actions/workflows/${WORKFLOW_FILE}`;
+            
+            // Encode parameters
+            const params = new URLSearchParams({
+                'youtube_url': youtubeUrl,
+                'youtube_cookies': cookies,
+                'destination_folder': folder,
+                'output_filename': filename,
+                'audio_format': format,
+                'audio_quality': quality
+            });
+
+            // GitHub Actions tidak support pre-filled inputs via URL
+            // Jadi kita arahkan ke halaman workflow dan copy data ke clipboard
+            
+            const workflowData = {
+                youtube_url: youtubeUrl,
+                youtube_cookies: cookies,
+                destination_folder: folder,
+                output_filename: filename,
+                audio_format: format,
+                audio_quality: quality
+            };
+
+            // Copy ke clipboard
+            const textToCopy = `YouTube URL: ${youtubeUrl}\nCookies: ${cookies || '(tidak ada)'}\nFolder: ${folder}\nFilename: ${filename}\nFormat: ${format}\nQuality: ${quality}`;
+            
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                showResult('success', '✅ Data telah disalin ke clipboard! Anda akan diarahkan ke GitHub Actions dalam 3 detik...');
+                
+                // Save to localStorage for reference
+                localStorage.setItem('lastDownloadData', JSON.stringify(workflowData));
+                
+                setTimeout(() => {
+                    window.open(baseUrl, '_blank');
+                }, 3000);
+            }).catch(() => {
+                showResult('info', '📋 Silakan copy data manual, kemudian klik tombol di bawah untuk buka GitHub Actions.');
+                
+                setTimeout(() => {
+                    window.open(baseUrl, '_blank');
+                }, 2000);
+            });
+        });
+
+        function showResult(type, message) {
+            result.className = `result ${type}`;
+            result.innerHTML = message;
+            result.style.display = 'block';
+        }
+
+        // Auto-fill dari localStorage jika ada
+        window.addEventListener('load', function() {
+            const lastData = localStorage.getItem('lastDownloadData');
+            if (lastData) {
+                try {
+                    const data = JSON.parse(lastData);
+                    if (data.destination_folder) document.getElementById('folder').value = data.destination_folder;
+                    if (data.audio_format) document.getElementById('format').value = data.audio_format;
+                    if (data.audio_quality) document.getElementById('quality').value = data.audio_quality;
+                } catch (e) {
+                    console.log('Could not restore last data');
+                }
+            }
+        });
+    </script>
+</body>
+</html>
